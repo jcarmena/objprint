@@ -28,19 +28,22 @@ class ObjPrint:
 
         self.config(**self._configs)
 
-    def objprint(self, obj, include=[], exclude=[], file=None, **kwargs):
+    def objprint(self, obj, include=[], exclude=[], file=None, max_string=None, **kwargs):
         if kwargs:
             cfg = self._save_config()
             self.config(**kwargs)
-            self._sys_print(self.objstr(obj, include=include, exclude=exclude), file=file)
+            self._sys_print(self.objstr(obj, include=include, exclude=exclude, max_string=max_string), file=file)
             self._load_config(cfg)
         else:
-            self._sys_print(self.objstr(obj, include=include, exclude=exclude), file=file)
+            self._sys_print(self.objstr(obj, include=include, exclude=exclude, max_string=max_string), file=file)
 
-    def objstr(self, obj, indent_level=0, include=[], exclude=[]):
+    def objstr(self, obj, indent_level=0, include=[], exclude=[], max_string=None):
         # If it's builtin type, return it directly
         if isinstance(obj, str):
-            return f"'{obj}'"
+            if max_string and len(obj)>int(max_string):
+                return f"'{obj[:int(max_string)]}...'"
+            else:
+                return f"'{obj}'"
         elif isinstance(obj, int) or \
                 isinstance(obj, float) or \
                 obj is None:
@@ -63,7 +66,7 @@ class ObjPrint:
         elif isinstance(obj, dict):
             elems = (
                 f"{self.objstr(key, indent_level + 1)}: {self.objstr(val, indent_level + 1, include=include, exclude=exclude)}"
-                for key, val in sorted(obj.items())
+                for key, val in obj.items()
             )
         else:
             # It's an object
@@ -84,11 +87,11 @@ class ObjPrint:
         def _get_line(key):
             val = self.objstr(obj.__dict__[key], indent_level + 1, include=include, exclude=exclude)
             if self.label and any(re.fullmatch(pattern, key) is not None for pattern in self.label):
-                return set_color(f".{key} = {val}", COLOR.YELLOW)
+                return set_color(f"{key}={val}", COLOR.YELLOW)
             elif self.color:
-                return f"{set_color('.'+key, COLOR.GREEN)} = {val}"
+                return f"{set_color(key, COLOR.GREEN)}={val}"
             else:
-                return f".{key} = {val}"
+                return f"{key}={val}"
 
         if hasattr(obj, "__dict__"):
             keys = []
@@ -101,7 +104,7 @@ class ObjPrint:
                         continue
                 keys.append(key)
 
-            elems = (_get_line(key) for key in sorted(keys))
+            elems = (_get_line(key) for key in keys)
         else:
             return str(obj)
 
@@ -178,9 +181,26 @@ class ObjPrint:
         elif self.width is not None and sum((len(elem) for elem in elems)) > self.width:
             multiline = True
 
+        lines = []
+        line = None
+        for e in elems:
+            if line == None:
+                if multiline:
+                    line = self.add_indent(e, indent_level+1)
+                else:
+                    line = e
+            elif len(line+", "+e) > 180:
+                lines.append(line)
+                if multiline:
+                    line = self.add_indent(e, indent_level+1)
+                else:
+                    line = e
+            else:
+                line += ", " + str(e)
+        if line is not None:
+            lines.append(line)
+        s = ",\n".join(lines)
         if multiline:
-            s = ",\n".join(self.add_indent(elems, indent_level + 1))
             return f"{header}\n{s}\n{self.add_indent('', indent_level)}{footer}"
         else:
-            s = ", ".join(elems)
             return f"{header}{s}{footer}"
