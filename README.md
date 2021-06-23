@@ -7,6 +7,10 @@ A library that can print Python objects in human readable format
 ## Install
 ```
 pip install objprint
+
+or
+
+pipenv install -e git+https://github.com/jcarmena/objprint.git@cc714f116ebfacb0737bc1b6c8ccaecf22da6486#egg=objprint
 ```
 
 ## Usage
